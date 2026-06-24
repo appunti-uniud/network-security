@@ -1,0 +1,449 @@
+\documentclass[light]{academica}
+
+\title{WireGuard}
+\overtitle{Essay for the ``Computer Network Security'' course}
+\subtitle{a faster secure tunneling alternative}
+\author{Filippo Merlo}
+
+\begin{document}
+
+\maketitle
+
+\frontmatter
+
+\tableofcontents
+
+\abstract
+
+In this essay is presented an analysis of WireGuard, a modern \textit{Virtual Private Network} (VPN) protocol designed to provide secure and efficient communication through a minimalist and optimized architecture.
+
+\autoref{chap:introduction} introduces the author's ideas to explain why has been designed, along with the protocol's goals and a quick summary of the qualities that this protocol delivers.
+
+In \autoref{chap:protocol} are examined the protocol’s core components, including the cryptographic primitives adopted, the handshake design and the key management, highlighting how WireGuard departs from traditional VPN solutions by prioritizing simplicity, clarity, and performance.
+
+The security evaluation in \autoref{chap:security} focuses on the protocol’s resistance to common network attacks, thanks to its small attack surface and the authenticated key exchange, where particular attention is given to its DoS-mitigation capabilities.
+Furthermore, is also described a post-quantum security configuration.
+
+Lastly, in \autoref{chap:performance} and \ref{chap:usage} are respectively provided the benchmark results against its secure tunneling alternatives, and some common usage and deployment characteristics, with the aim of showing the simplicity of WireGuard's configuration and adoption.
+
+\mainmatter
+
+\chapter{Introduction}\label{chap:introduction}
+
+Since people realized the importance of \textbf{information security}, the development of high-performance secure systems has been a priority of the modern era.
+This acknowledgement has been even more emphasized in the field of network security because it concerns the most vulnerable context from a data security point of view, precisely when data travel from one device to another.
+This is the case because these data are subject to several attack types, from cryptographical flaws to human errors, and the vulnerability lies in the heterogeneity and quantity of devices that connect the two endpoints.
+All these devices are usually different in hardware, software and even communication protocols, but data still have to travel by these in order to reach the endpoint.
+That's why is crucial for a protocol to be transversally compatible with others to securely forward data traffic.
+
+Among the different strategies developed in the years to secure the network, one is the \textbf{secure network tunneling}.
+Numerous implementation proposals have been made that provides this security feature, but by far the most popular are \textbf{IPsec} and \textbf{OpenVPN}, which were among the first solutions proposed and have become pillars in network security.
+The evolution of the already complex networking ecosystem over the years allowed IPsec and OpenVPN to become increasingly secure.
+This however meant an increase in their implementation complexity, translating to more resource-hungry and overhead-prone protocols.
+That's the reason why the proposal of new, easier and more efficient protocols that implement secure network tunneling never stopped, and \textbf{WireGuard}~\cite{whitepaper} is one of the most recent ones.
+The credit for its success relies on its main author Jason A. Donenfeld, whose goals and ideas resulted in a solution that felt like an improvement of the mainstream alternatives.
+
+Before setting his goals, Donenfeld started from analyzing the already available solutions which provided secure tunnels, \ie IPsec and OpenVPN.
+From these he extracted the best qualities and worst aspects in order to create a better alternative, with fewer downsides and improved security.
+He highlighted the following problems in the available protocols:
+\begin{itemize}
+  \item IPsec adds its own layering structure with their semantic, structure, and packet management, ending with a malleable and secure environment at the expense of having a very \textbf{complex protocol} and implementation.
+  \item OpenVPN instead is based directly on TLS, but this is a double-edged sword because, as a downside, it has to manage all TLS \textbf{overhead}, therefore augmenting the attack surface and bringing in more vulnerabilities that need to be addressed. For this reason OpenVPN environment is more difficult to manage and deal with, meaning that is more error-prone and \textbf{less efficient} than IPsec counterpart.
+\end{itemize}
+
+According to Donenfeld, a common and key mistake in the security and performance of a protocol lies in the protocol's complexity, therefore, one goal for his secure system, was to create a \textbf{simpler and cleaner solution}.
+
+Another shared issue is the underlying structure: IPsec opted for its custom layering that has to maintain by itself, while OpenVPN based its structure on an already complex and high-level protocol.
+WireGuard's author decided that the second goal, in line of thoughts with the first one, would have been to add as little as possible to the TCP/IP stack, \textbf{exploiting existing functions and components}, without reinventing the wheel.
+
+Finally, the third main goal was of course to provide a secure and resilient protocol, but contrary to IPsec, it has been adopted a \textbf{strict non-agile cryptographical approach}.
+For the ending user this last choice can be a burden, but, from a protocol security standpoint, it means being able to provide higher security standards due to a \textsl{smaller attack surface} and an easier \textsl{detection of unsafe/outdated instantiations}.
+
+
+\chapter{Protocol}\label{chap:protocol}
+
+\section{Overview}\label{sec:overview}
+
+As discussed in \autoref{chap:introduction} regarding the ideas behind the WireGuard concept, the features provided by its deployment respect all the goals set and are here summarized:
+\begin{itemize}
+  \item simple protocol structure;
+  \item reuse of available network components;
+  \item little overhead;
+  \item cryptographically opinionated;
+  \item clean and minimal implementation.
+\end{itemize}
+
+The first two points can even be seen as a single one, because WireGuard simplicity relies on the reuse of existing functions.
+However, it's still important to explicitly point out the first feature for two reasons: first, it's not a trivial quest realizing a secure protocol without compromising on its complexity, second, reusability doesn't imply simplicity in most cases.
+Furthermore, this characteristic not only influences the protocol final performance, but allowed its developers to build a clean and minimal implementation, making the protocol even easily verifiable via formal methods (see~\autoref{sec:verlim}).
+In this way not a single variable is left unaccounted-for, and all security scenarios can be tested before releasing new versions.
+These advantages combined with being open source creates the perfect recipe for sustainability, because, with a small and clear codebase, editing and auditing becomes easier, allowing even less experienced users to help with the contributions.
+
+WireGuard isn't based on any specific layering, instead uses virtual interfaces, \eg \texttt{wg0}, to associate an IP address to a peer, following one of the fundamental principles of VPN.
+In this way, WireGuard needs only to handle the sessions, which it does via a timer state machine, while the connection is managed by the system itself.
+Furthermore, the virtual interfaces can be managed by the end user directly via \texttt{ip} and \texttt{ipconfig} standard shell commands and the same applies with firewall rules.
+This solution solves most of the protocol problems that originates from initial misconfigurations and connection failures.
+
+\newpage
+\section{Configuration}\label{sec:configuration}
+
+For each interface, WireGuard requires several variables maintained locally, plus a routing table with the following data:
+\begin{itemize}
+  \item a key pair, consisting of public and private keys associated to the interface itself;
+  \item the UDP\footnote{User Datagram Protocol} port used for listening (default 41414);
+  \item a list of peers, identified by their public key, where each one is associated to a list of allowed incoming/outgoing IPs.
+\end{itemize}
+An example is given in~\autoref{table:routing}.
+
+\begin{table}[H]
+  \centering
+  \caption{Example of cryptokey routing table for interface \texttt{wg0}}
+  \label{table:routing}
+  \begin{tabular}{|cc|c|cc|}
+    \hline
+    \textbf{Interf. public key} & \textbf{Interf. private key} & \textbf{UDP port} & \textbf{Peer public key} & \textbf{Allowed IPs} \\
+    \hline
+    & & & \texttt{xTIB\dots p8Dg} & \texttt{10.192.122.3/32}, \\
+    & & & & \texttt{10.192.124.0/24} \\
+    \texttt{HIgo\dots 8ykw} & \texttt{yAnz\dots fBmk} & 41414 & \texttt{TrMv\dots WXX0} & \texttt{10.192.122.4/32}, \\
+    & & & & \texttt{192.168.0.0/16} \\
+    & & & \texttt{gN65\dots z6EA} & \texttt{10.10.10.230/32} \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\noindent
+Additional local parameters are set up during the 1-RTT\footnote{Round Trip Time} key exchange in the handshake phase (more on this later in~\autoref{sec:handshake}) and are:
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{0.9\textwidth}{lX}
+    $I$ & It refers to a peer identifier\\
+    $S^{pub}, S^{priv}$ & The public-private key pair, generated locally using an elliptic curve, namely \textsc{Curve25519}~\cite{curve25519} with 32 bytes, where the public key is the one shared with other peers via key distribution\\
+    $E^{pub}, E^{priv}$ & The ephemeral public-private key pair\\
+    $Q$ & An optional pre-shared symmetric key (explained in \autoref{sec:postquantum})\\
+    $H,C$ & A hash's digest and a chaining key value\\
+    $T^{send}, T^{recv}$ & Transport data symmetric key values for sending and receiving\\
+    $N^{send}, N^{recv}$ & Transport data message nonce counters for sending and receiving
+  \end{tabularx}
+\end{table}
+
+For each interface, three different sets of session data are maintained in memory, respectively of the previous session, of the current and of the future one.
+This is done both for a faster and smoother rekey phase and in prevention of possible late message deliveries.
+
+Furthermore, here are explained notations that will be used in later sections:
+\begin{itemize}
+  \item $0^n$ to mean an $n$-byte string of $0$s;
+  \item $\rho^n$ to represent random bit-string of $n$ bytes;
+  \item $\widehat{n}$ to represent the size $n + 16$ bytes of data, which means that to those $n$ bytes are concatenated $16$ bytes of Poly1305 authentication tag.
+\end{itemize}
+
+\begin{note}
+  By combining the key exchange and the layer 3 transport encryption into one mechanism and using a virtual interface rather than a transform layer, WireGuard indeed breaks traditional layering principles, at the advantage of a more practical and secure solution.
+\end{note}
+
+\section{Session}\label{sec:session}
+
+One of the root WireGuard's philosophies behind its sessions' management is \quoteinline{silence is a virtue}; \ie whenever possible it tries not to send any response, especially to non-au\-then\-ti\-ca\-ted peers.
+In this way, it is able to limit their service exposure, avoiding the majority of networking attacks, particularly passive ones like traffic scanners.
+By not responding if not necessary and silently dropping any packet that fails at any step of its management, WireGuard remains almost invisible to the outside.
+
+Another important aspect is that WireGuard \textbf{key distribution} isn't managed by itself, but instead is left up to the communicating peers.
+This development choice is related to the function-reuse philosophy along with the belief that addressing even the key distribution in layer 3 would have been a wrong choice, leading away from the main goals and ideas.
+For this reason, peers are free of choosing the secure mechanism they prefer for sharing their static public keys, from simple PGP-signed emails to more complex/ad-hoc key distribution systems.
+Moreover, this decision fits perfectly with their silence philosophy, because they just need to compute Diffie-Hellman over peers' pre-shared static keys as an authentication mechanism, instead of adding a signature system for this purpose.
+
+From the user's perspective, WireGuard appears \textbf{stateless} because, as already said before, there is no need for any type of configuration, unless wanted, let alone session maintenance, outside the just mentioned preemptive key-distribution.
+That's because WireGuard self-sustains via the employment of a simple time-based state machine.
+The variables used by this system are:
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{0.9\textwidth}{lX}
+    \textsc{Rekey-After-Messages} & A new session key is computed after $2^{60}$ messages\\
+    \textsc{Rekey-After-Time} & A new session key is computed after $120$s\\
+    \textsc{Reject-After-Messages} & After $2^{64} - 2^{13} - 1$ messages isn't sent or received any more transport data message, waiting for rekey\\
+    \textsc{Reject-After-Time} & After $180$s isn't sent or received any more transport data message, waiting for rekey\\
+    \textsc{Rekey-Attempt-Time} & $90$s for attempting re-initiation before shutting down the handshake phase\\
+    \textsc{Rekey-Timeout} & $5$s limit to wait for receiving the handshake response\\
+    \textsc{Keepalive-Timeout} & $10$s of no data transmission before is sent a keepalive message
+  \end{tabularx}
+\end{table}
+
+Under no circumstances WireGuard sends an initiation message more than once every \textsc{Rekey-Timeout}.
+Furthermore, session's age is calculated starting from when the session is completely active, \ie after the handshake has successfully ended.
+Lastly, it's important to know that rekeying is allowed only for initiator to prevent the \textit{thundering herd} problem, in which both peers might try concurrently to establish a new session.
+
+\section{Messages}
+
+The messages used by WireGuard are organized in four different types, specified in the packet field \texttt{msg.type} with their relative identifier.
+The types are depicted in \autoref{fig:msgtypes} and here explained:
+\begin{enumerate}
+  \item \textbf{Handshake Initiation}: used to initiate a WireGuard session (see next~\autoref{sec:handshake});
+  \item \textbf{Handshake Response}: sent to successfully conclude the handshake phase (see next~\autoref{sec:handshake});
+  \item \textbf{Handshake Reply}: special message used during the handshake phase as a reply to an initiation message to manage the case of an under load responder (explained in detail in~\autoref{sec:dos});
+  \item \textbf{Transport Data}: encrypted messages used to transmit data during an active WireGuard session (see~\autoref{sec:communication}).
+\end{enumerate}
+
+Furthermore, WireGuard implements another special message ``type'' which is the \textbf{keepalive message}, consisting of a transport data message with empty packet data (zero-length).
+This is part of a passive keepalive mechanism to ensure that sessions stay active and allow both peers to passively determine if a connection has failed or been disconnected.
+
+\begin{figure}
+  \begin{subfigure}{0.48\textwidth}
+    \input{tikz/handshake_initiation.tikz}
+    \caption{Handshake initiation message}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \input{tikz/handshake_response.tikz}
+    \caption{Handshake response message}
+  \end{subfigure}
+
+  \bigskip
+  \begin{subfigure}{0.48\textwidth}
+    \input{tikz/handshake_reply.tikz}
+    \caption{Handshake reply message}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \input{tikz/transport_data.tikz}
+    \caption{Transport data message}
+  \end{subfigure}
+  \caption{Types of messages}
+  \label{fig:msgtypes}
+\end{figure}
+
+\section{Handshake}\label{sec:handshake}
+
+To start a WireGuard session, a small handshake is implemented.
+During this phase is performed a simple 1-RTT key exchange between peers using an adapted Trevor Perrin’s Noise Framework~\cite{perrinnoise}, to both compute shared session parameters and perform an identity check.
+The peer that tries to establish a new session will be called \textit{initiator}, while the other will be the \textit{responder}.
+
+The initiator will send a handshake initiation message to the responder, which will be used by the receiver to check initiator's identity as well as using the additional \texttt{msg.timestamp} field to assure that it isn't a replay attack.
+If the identity check is successful, the responder sends back a handshake response message to the initiator.
+After this exchange, the phase is almost completed and waits for the initiator to send its first message.
+Only after this step, the responder peer will be allowed to send encrypted message to the initiator and the WireGuard session will be considered active.
+The exchange is illustrated in~\autoref{fig:handshakescheme}.
+
+To fill the handshake initiation message fields, the initiator calculates locally the value of the variables needed, in the following way:
+\begin{itemize}
+  \item it generates its ephemeral public-private key pair ($E_i^{pub}, E_i^{priv}$) from \textsc{Curve25519};
+  \item sets its identifier $I_i$ to a random value of 4 bytes (\ie $I_i = \rho^4$);
+  \item the static field \texttt{msg.static} will be equal to AEAD applied over $H_i$ using $C_i$ as key, where $H_i$ is obtained by applying two \textsc{BLAKE2s} hash functions over receiver's interface and its own ephemeral public keys (\ie $S_r^{pub}, E_i^{pub}$), while $C_i$ is calculated via an HKDF\footnote{HMAC Keyed Derivation Function} over receiver's interface key and its own ephemeral private key ($S_r^{pub}, E_i^{priv}$);
+  \item lastly the timestamp field will be also generated using AEAD, but over the current time and using the hash of the static value as key.
+\end{itemize}
+The same computations will be done by the responder, after having processed the handshake initiation message, for its handshake response.
+
+\begin{figure}[H]
+  \centering
+  \input{tikz/handshake_scheme.tikz}
+  \caption{Handshake phase protocol scheme}
+  \label{fig:handshakescheme}
+\end{figure}
+
+\section{Communication}\label{sec:communication}
+
+After the handshake is over, peers can both exchange messages while the session is active, that are managed by WireGuard in the following way:
+
+\subsubsection{Send}
+
+\begin{itemize}
+  \item when a packet is ready to be sent from a WireGuard interface, it's inspected to derive the receiver IP;
+  \item this IP is matched against the list of allowed IPs of the routing table to check if it's valid and if so, to retrieve the sending session key $T^{send}$ and the message counter;
+  \item then the IP packet is encrypted using the key, while the counter value is first copied into WireGuard's header \texttt{msg.counter} field, then it's locally incremented;
+  \item finally, the encrypted packet is ready to be sent via UDP.
+\end{itemize}
+
+\subsubsection{Receive}
+
+\begin{itemize}
+  \item if an incoming UDP packet has WireGuard's custom header is added to WireGuard's incoming queue;
+  \item when the packet is processed, from its header are derived the sender identifier, the message counter (more on this later in \autoref{chap:security}) and the IP packet encapsulated;
+  \item first are checked the first two values, then WireGuard tries to decrypt the transport data using session's key. If any step fails, then the encrypted packet is dropped;
+  \item with now the decrypted packet, WireGuard proceeds to check if it's a valid IP packet and then performs a final reverse authentication by checking that the sender IP specified in the packet matches the initial IP source. Also in this case, failure is treated by silently dropping the packet;
+  \item if everything was successful, the IP packet in clear text is redirected back to the UDP queue, waiting to be processed.
+\end{itemize}
+
+\chapter{Security}\label{chap:security}
+
+\section{Denial of Service}\label{sec:dos}
+
+As explained in the previous chapter, WireGuard bases its security on the cryptographical strength of \textsc{Curve25519} Elliptic curve.
+This curve has not only being proven to be very secure, but it's also extremely fast on most processors, even more applied when applied Diffie-Hellman (ECDH) as verified in \cite{curve25519}.
+However, computing elliptic curve point multiplication is still a very demanding task for the CPU, and this can cause a \textit{Denial of Service} (DoS) if there is no available CPU's computational power.
+On the other side, being able to compute point multiplication is fundamental for applying Diffie-Hellman in the authentication step of the first handshake, therefore WireGuard author decided to allow the responder to refuse processing handshake messages, to mitigate this problem.
+This refusal is treated differently from packet failures or invalid authentications, because if WireGuard simply dropped handshake initiation packets, a possible DoS would not be prevented because an adversary could just resend new requests indefinitely, which would not solve the root issue.
+Instead, WireGuard implements a simple IP authentication using MAC\footnote{Message Authentication Code}, in order to apply existing rate limiting algorithms.
+The solution adopted by WireGuard consists of:
+\begin{itemize}
+  \item the responder generates a cookie by computing the MAC of the initiator’s source IP address with a secret key, where the key is nothing but a random value, known only to the responder, that changes every two minutes, thus granting unforgeability;
+  \item the responder refuses the handshake by replying with the generated cookie;
+  \item whenever the initiator knows it can retry to open a new WireGuard session with that peer, it will send the output of the MAC of the request message using the received cookie as key;
+  \item now, whenever the responder receives a new request, it can authenticate the initiator by checking the authenticity of the message, which succeeds only if the source IP matches the initiator's one. Hereafter, because a \textit{Pseudo-Random Number Generator} (PRNG) is used for creating the first secret key, the responder can determine how old the previous attempt is and decide whether to apply rate limiting or to accept the handshake.
+\end{itemize}
+
+\begin{figure}
+  \centering
+  \input{tikz/handshake_scheme_underload.tikz}
+  \caption{Handshake phase protocol scheme when responder is under load}
+  \label{fig:handshakeschemeunderload}
+\end{figure}
+
+\newpage
+
+However, WireGuard's solution to DoS as it is, is still far from perfect, because it opens to the following problem:
+\begin{enumerate}
+  \item breaks the \quoteinline{silence is a virtue} property adopted until now;
+  \item sending the cookie in plaintext allows \textit{Man In The Middle} (MITM) attacks;
+  \item in a scenario where a peer is nefarious, the other peer could be subject to DoS attacks if the evil peer acts as a false responder and starts flooding the first with cookie replies.
+\end{enumerate}
+WireGuard's author addressed all these issues:
+\begin{itemize}
+  \item to all WireGuard packets, including the first for the handshake, is added a MAC (called \texttt{msg.mac1}) computed over responder's public key. In this way the responder can check MAC's output: if it's correct, it means that the sender knows the receiver and vice-versa, thus he can be trusted and silence can be break securely. Contrarily, if the check fails, it means that they don't know each other, therefore could even be a passive attack like a traffic scanner, so the packet is discarded.
+  \item the 2nd and 3rd vulnerabilities are addressed together by applying the \textit{Authenticated Encryption with Associated Data} (AEAD) technique, which fits perfectly because it provides both data confidentiality and authenticity. AEAD, initialized with a random nonce, is applied to the cookie with \texttt{msg.mac1} (initiator MAC) as additional data to encrypt everything using sender's public key. This means that the cookie isn't sent in clear text, plus the associated data give the initiator a way to check the authenticity of the cookie message reply, solving both issues.
+\end{itemize}
+Now, whenever the initiator retries to start the handshake can just send the output of a second MAC, called \texttt{msg.mac2}, using the cookie as key.
+On the other side, when the responder is under load, he will only accept requests that have the second MAC set in the message.
+
+\section{Post-Quantum}\label{sec:postquantum}
+
+Looking forward to quantum computing, security will be strongly affected, giving the attackers more computational power and, more probably than not, new vulnerabilities to exploit.
+To assert this issue as well, WireGuard's authors added an additional encryption layer with another key than those normally used by the protocol, but not to make WireGuard post-quantum secure, but to mitigate the risk of an adversary who may record traffic now to decrypt it in the future using quantum capabilities.
+In fact, this additional security isn't needed by WireGuard to be secure today; rather, it was implemented for those who want to be more cautious or meet special requirements for which their traffic will still be critical even several years in the future.
+For this reason its developers added this so called \textbf{pre-shared symmetric key mode} only as an optional feature.
+With this mode enabled, it will be comprehended in the protocol an additional encryption layer that uses a 256 bits pre-shared symmetric key called $Q$, on top of the \textsc{Curve25519} ECDH cryptographical function.
+
+It's important to stress that this mode has not been made to achieve security, because WireGuard with a default configuration already is, nor as a post-quantum solution.
+That's why it's an optional mode, made only to make pre-quantum traffic data more post-quantum resilient.
+
+Instead, for those searching for a post-quantum ready solution, a forked WireGuard version has been implemented in \cite{pq-wireguard}, where their authors have proposed a post-quantum version, with an updated handshake, called \textbf{PQ-WireGuard}.
+In fact, with this version, its authors wanted to achieve forward secrecy and a sound authentication process for a future post-quantum scenario.
+The updated handshake has replaced the Diffie-Hellman 1-RTT exchange with a \textit{Key-Encapsulation Mechanism} (KEM) and the entire protocol formal verification constraints have been adapted, to also assert PQ-WireGuard's security via Tamarin proofs.
+Of course, it has also been benchmarked against WireGuard, and their results showed that their post-quantum proposal was less efficient with an average of a $60\%$ ping time increase.
+Still the performance keep up with IPsec timings, meaning that their post-quantum version was almost as efficient as normal VPN alternatives.
+
+\section{Formal Verification and Limitations}\label{sec:verlim}
+
+Because WireGuard implementation is very minimal, their developing team succeeded in formally verifying the entire protocol formally, leaving no doubts in their security claims.
+To do so, they used \textbf{Tamarin}, an open source formal verification tool to symbolically analyze cryptographical protocols via \textit{lemmas}, \ie logical relations that match properties and steps of the analyzed protocol.
+It supports different adversary models, making the verification against different combinations of attacks and threat models possible.
+
+Being able to use Tamarin as a security attestation has been possible only because of protocol's simple structure, otherwise translating every aspect (\eg states, resources, or other execution constraints) to a logical property would have been too complex to manage or express formally.
+
+The verification process and methodologies are explained by WireGuard's authors in a separate paper \cite{wireguardverification}, where is provided a high-level symbolic analysis.
+However, it misses computational proofs and the analysis is not in-depth, therefore it has been published another paper entitled \quoteinline{A Cryptographic Analysis of the WireGuard Protocol} \cite{secanalysis} by different authors (Dowling and Paterson), where these verifications are performed and a better overview of WireGuard's limitations is given.
+
+Particularly they focused on the analysis of the handshake phase.
+In the official documentation it's described as a 1-RTT key exchange, but they point out that it's not an entirely correct statement.
+In fact, without the first transport data message from the initiation, the two previous messages (handshake initiation and response) aren't enough to provide entity authentication of the initiator to the responder.
+This problem has already been identified by Donenfeld, still he explains in its documentation that the lack of this message allows \textit{Key Compromise Impersonation} (KCI) attacks, therefore he came down to this compromise.
+Moreover, Dowling and Paterson have identified another attack, for which it becomes impossible to prove \textit{Key Indistinguishability} (KI); property that in a key exchange protocol is crucial.
+
+Another WireGuard's vulnerability, related again to the handshake, affects the identity-hiding forward secrecy property.
+Data packets do have this property, which is granted by the handshake, instead the handshake itself doesn't.
+That's the case because the sender's public key is encrypted using the static public key of the responder, therefore if the responder's private key gets compromised, an attacker can figure out who has sent the handshakes.
+
+Lastly, but not less important, WireGuard is even vulnerable to packet inspection.
+In fact, this protocol only provides cryptographical security and doesn't implement any obfuscation mechanism against an adversary who may try to deeply analyze traffic data via cryptanalytical techniques.
+Doing so, an attacker can manipulate the protocol's normal behavior by modifying headers or payloads, inducing the protocol to act unexpectedly or to make malicious traffic appear legitimate.
+
+All these downsides come as a price for the security measures adopted in the protocol.
+This doesn't imply that WireGuard isn't secure, because a perfect protocol, secure against everything, doesn't exist.
+Still, it's crucial for developers as well as end users to know which is the protocol's aim and what are its security characteristics and limitations.
+In this way, the protocol can be adopted securely, exploiting all its potential and maybe even combining it with other solutions in order to mitigate its vulnerabilities.
+
+\chapter{Performance}\label{chap:performance}
+
+Thanks to its minimal and simple protocol structure, it has been possible for WireGuard's many contributors to create the kernel implementation under $4000$ lines of code.
+Moreover, WireGuard's philosophy of component reuse helped also in the kernel integration process, which have been very smooth.
+In fact, this made it possible to build WireGuard as an external module that integrates natively with the Linux kernel, without requiring any change to it.
+
+This implementation has been benchmarked against IPsec and OpenVPN on two different machines, respectively with an Intel Core i7-3820QM and an Intel Core i7-5200U with Intel 82579LM and Intel I218LM gigabit Ethernet cards, over a period of 30 minutes.
+
+\begin{table}[H]
+  \centering
+  \caption{VPN benchmark test results}
+  \label{table:benchmark}
+  \begin{tabular}{|l|l|c|c|}
+    \hline
+    & \textbf{Configuration} & \textbf{Throughput}\footnotemark {[Mbps]} & \textbf{Ping time}\footnotemark {[s]}\\
+    \hline
+    \textsl{IPsec} & \textsc{ChaCha20-Poly1305} & 825 & 0.501\\
+          & AES-GCM & 881 & 0.508\\
+    \textsl{OpenVPN} & AES with HMAC-SHA2-256 & 258 & 1.541\\
+    \textsl{WireGuard} & \textsc{ChaCha20-Poly1305} & \cellcolor{blue!60} 1011 & \cellcolor{blue!60} 0.403 \\
+    \hline
+  \end{tabular}
+\end{table}
+\footnotetext[1]{higher is better}
+\footnotetext{lower is better}
+
+From these results, there is no doubt that WireGuard outperforms both VPN alternatives, presenting itself not only as a faster secure tunneling solution, but also more efficient one.
+If we take a closer look at the benchmarks, only WireGuard was able to saturate the bandwidth, while the other two solutions have been limited by the CPU instead.
+This means that WireGuard is highly efficient, with very little overhead, thus consuming less energy.
+
+\chapter{Usage}\label{chap:usage}
+
+To create, apply, and show a WireGuard interface, everything is done via simple the simple \texttt{ip} shell commands.
+In \autoref{fig:wg0add} is shown a simple configuration via \textit{Command Line Interface} (CLI), while in \autoref{fig:wg0conf} the most commonly used WireGuard commands are presented.
+
+\begin{figure}[H]
+  \begin{verbatim}
+    $ ip link add dev wg0 type wireguard
+    $ ip address add dev wg0 10.192.122.3/24
+    $ ip route add 10.0.0.0/8 dev wg0
+    $ ip address show
+      1: lo: <LOOPBACK> mtu 65536 inet 127.0.0.1/8 scope host lo
+      2: eth0: <BROADCAST> mtu 1500 inet 192.95.5.69/24 scope global eth0
+      3: wg0: <POINTOPOINT,NOARP> mtu 1420 inet 10.192.122.3/24 scope global wg0
+  \end{verbatim}
+  \caption{Shell commands to add a \texttt{wg0} interface~\cite[Chapter 4]{whitepaper}}
+  \label{fig:wg0add}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{verbatim}
+    $ wg setconf wg0 configuration.conf
+    $ wg show wg0
+      interface: wg0
+        public key: HIgo...8ykw
+        private key: yAnz...fBmk
+        listening port: 41414
+      peer: xTIB...p8Dg
+        allowed ips: 10.192.124.0/24, 10.192.122.3/32
+      peer: TrMv...WXX0
+        allowed ips: 192.168.0.0/16, 10.192.122.4/32
+      peer: gN65...z6EA
+        allowed ips: 10.10.10.230/32
+        endpoint: 192.95.5.70:54421
+    $ ip link set wg0 up
+  \end{verbatim}
+  \caption{Basic commands to show/use the \texttt{wg0} interface created in~\autoref{fig:wg0add}}
+  \label{fig:wg0conf}
+\end{figure}
+
+
+As it is possible to infer from these images, the commands are very simple, and their meaning is straightforward, even for beginner Linux users.
+However, extensive documentation is available on the WireGuard official website \url{https://www.wireguard.com/} including a Quickstart guide with videos, common configurations and other command examples that can help not only those in difficulty, but also aimed at those searching for a more customized and complex configuration.
+
+\chapter{Conclusion}\label{chap:conclusion}
+
+In conclusion, the protocol described in \autoref{chap:protocol} successfully meets the goals outlined in the introduction.
+WireGuard’s developers have managed to combine the essential components and mechanisms required for a secure tunneling solution into a remarkably compact and coherent design.
+Its minimal structure, together with a consistent use of modern and well-established cryptographic primitives, results in a protocol that is both easy to understand and effective in practice.
+
+The security analysis confirms that the protocol’s construction enables strong protection against common network attacks.
+The integration of DoS-mitigation measures, combined with the adoption of well-known cryptographic primitives, including Curve25519 for key exchange, HKDF for key derivation, and ChaCha20-Poly1305 for authenticated encryption, are the security pillars of WireGuard.
+However, WireGuard is not perfect and has its own limitations due to some trade-offs between security and efficiency that a user needs to be aware of.
+In fact, their encapsulation doesn't guarantee complete information hiding, and they don't officially support post-quantum security mechanisms.
+
+The performance evaluation clearly shows that WireGuard offers advantages over traditional VPN solutions such as IPsec and OpenVPN.
+Furthermore, its straightforward configuration and intuitive commands further enhance its usability, making it accessible to less experienced users.
+
+Finally, being an open-source project available in Jason A. Donenfeld's git repository \url{https://git.zx2c4.com/wireguard-linux/}, WireGuard continues to benefit from an active and growing community.
+This community contributes to the protocol’s ongoing development through reviews, audits, and feedbacks, reinforcing the reliability and sustainability of WireGuard's project.
+
+\backmatter
+
+\references
+
+\end{document}

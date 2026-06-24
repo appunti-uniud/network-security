@@ -1,0 +1,15 @@
+\begin{tikzpicture}
+
+  \draw [rounded corners] (-4,-3) rectangle (4,1);
+  \foreach \y in {-2,...,0}
+  \draw[-] (-4,\y) -- (4,\y);
+
+  \node at (-2.2,0.5) {type: $0x4$ (1 byte)};
+  \draw[-] (-0.5,0) -- (-0.5,1);
+  \node at (1.7,0.5) {reserved: $0^3$ (3 bytes)};
+
+  \node at (0,-0.5) {sender: $I_{m^\prime}$ (4 bytes)};
+  \node at (0,-1.5) {counter (8 bytes)};
+  \node at (0,-2.5) {packet ($\widehat{\left\Vert P \right\Vert}$ bytes)};
+
+\end{tikzpicture}

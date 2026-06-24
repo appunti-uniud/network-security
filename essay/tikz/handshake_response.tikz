@@ -1,0 +1,22 @@
+\begin{tikzpicture}
+
+  \draw [rounded corners] (-4,-3) rectangle (4,2);
+  \foreach \y in {-2,...,1}
+  \draw[-] (-4,\y) -- (4,\y);
+
+  \node at (-2.2,1.5) {type: $0x2$ (1 byte)};
+  \draw[-] (-0.5,1) -- (-0.5,2);
+  \node at (1.7,1.5) {reserved: $0^3$ (3 bytes)};
+
+  \node at (-2,0.5) {sender: $I_r$ (4 bytes)};
+  \draw[-] (0,0) -- (0,1);
+  \node at (2,0.5) {sender: $I_i$ (4 bytes)};
+
+  \node at (0,-0.5) {ephemeral (32 bytes)};
+  \node at (0,-1.5) {empty ($\widehat{0}$ bytes)};
+
+  \node at (-2,-2.5) {mac1 (16 bytes)};
+  \draw[-] (0,-2) -- (0,-3);
+  \node at (2,-2.5) {mac2 (16 bytes)};
+
+\end{tikzpicture}

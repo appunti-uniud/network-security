@@ -1,0 +1,77 @@
+% !TEX encoding = UTF-8
+% !TEX program = pdflatex
+% !TeX spellcheck = en_GB
+% !BIB = biber
+
+
+\documentclass[english]{article}
+\usepackage{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\graphicspath{{./images/}}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true, 
+	linkcolor=blue, 
+	filecolor=blue, 
+	citecolor = black,       
+	urlcolor=blue, 
+}
+
+\usepackage{biblatex}
+\addbibresource{essay_biblio.bib}
+
+\title{An Essay for the exam of Network Security}
+\author{A. Student}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The essay should be about 15 pages. As a suggestion, pretend that I am your future CTO, and have asked you to study a given problem and present me some solution. Your aim is to brief me about that solution, explain pros and cons, in order to be able to take an informed decision.
+\end{abstract}
+
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+
+In the introduction, give a description of the subject: applications, importance, aims, etc.
+
+I suggest using Bib\TeX\ or Bib\LaTeX\ and \texttt{biber} for bibliography. Reference are easily cited like this: \cite{stallings2015computer}.
+
+\section{Threat model}
+Describe the potential threats, vulnerabilities, and risks to a computer network or system. 
+%It involves assessing the various ways in which an attacker could compromise the system's confidentiality, integrity, or availability.
+More precisely, define:
+\begin{itemize}
+\item Assets: the valuable resources, data, or systems which are to be protected.
+\item Attackers: the potential threat actors %their motivations, capabilities, and the resources they may have at their disposal.
+\item Attack vectors: Identify the potential ways in which attackers could exploit vulnerabilities to gain unauthorized access or cause harm. %This includes considering both external threats (such as network attacks) and internal threats (such as insider attacks).
+\end{itemize}
+
+\section{Security goals}
+Describe the security goals that we aim to achieve on the identified assets, according to the CIAAA model.
+
+
+\section{Security service and implementation}
+Describe the security services to be implemented, and how these are implemented: protocols, algorithms, procedures, etc.
+
+
+\section{Attacks and Vulnerabilities}
+Possible vulnerabilities (if known) and corrections (if known)
+
+
+\section{Conclusions}
+Critical analysis about the effectiveness of the solution.
+
+\appendix
+\section{Something I forgot}
+If needed, extra material (eg. long code listings, traces, logs, etc) can be put in the appendix.
+
+
+\printbibliography
+\end{document}

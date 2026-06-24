@@ -1,0 +1,20 @@
+\begin{tikzpicture}
+
+  \draw [rounded corners] (-4,-3) rectangle (4,3);
+  \foreach \y in {-2,...,2}
+  \draw[-] (-4,\y) -- (4,\y);
+
+  \node at (-2.2,2.5) {type: $0x1$ (1 byte)};
+  \draw[-] (-0.5,2) -- (-0.5,3);
+  \node at (1.7,2.5) {reserved: $0^3$ (3 bytes)};
+
+  \node at (0,1.5) {sender: $I_i$ (4 bytes)};
+  \node at (0,0.5) {ephemeral (32 bytes)};
+  \node at (0,-0.5) {static ($\widehat{32}$ bytes)};
+  \node at (0,-1.5) {timestamp ($\widehat{12}$ bytes)};
+
+  \node at (-2,-2.5) {mac1 (16 bytes)};
+  \draw[-] (0,-2) -- (0,-3);
+  \node at (2,-2.5) {mac2 (16 bytes)};
+
+\end{tikzpicture}

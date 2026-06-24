@@ -1,0 +1,401 @@
+% !TeX program = lualatex
+
+\documentclass[light]{presenta}
+
+\title{WireGuard}
+\author{Filippo Merlo}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Table of Contents}
+  \tableofcontents
+\end{frame}
+
+\section{Introduction}
+
+\begin{frame}{Introduction}
+  \begin{itemize}
+    \item transmitting data between computers;
+    \item protecting data traffic;
+    \item proposal of different securing strategies, such as VPNs.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{What is a VPN?}
+  The name, \textit{Virtual Private Network}, almost explains itself.
+  It's a communication protocol, usually implemented at layer 3 of the ISO/OSI stack, which provides all CIAAA properties.
+  \begin{figure}[H]
+    \input{tikz/ciaaa.tikz}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Existing implementations}
+  The most famous and adopted VPN protocols are:
+  \begin{itemize}
+    \item \textbf{IPsec}, developed in 1996;
+    \item \textbf{OpenVPN}, created by James Yonan in 2001;
+    \item \textbf{WireGuard}~\cite{whitepaper}, ideated and implemented by Jason A. Donenfeld in 2015.
+  \end{itemize}
+\end{frame}
+
+\section{WireGuard}
+
+\begin{frame}{Purpose}
+  Built to provide a secure tunneling protocol without the issues of the other solutions:
+  \begin{itemize}
+    \item complex system;
+    \pause
+    \item heavy layering;
+    \pause
+    \item high overhead;
+    \pause
+    \item difficult management and maintenance.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Goals}
+  The characteristics for which WireGuard aimed are:
+  \begin{itemize}
+    \item simplicity;
+    \pause
+    \item efficiency and optimization;
+    \pause
+    \item minimally implementable; % less dependecies
+    \pause
+    \item cryptographically sound;
+    \pause
+    \item formally verifiable;
+    \pause
+    \item beginner-friendly.
+  \end{itemize}
+\end{frame}
+
+\section{Protocol}
+
+\begin{frame}{Configuration}
+  WireGuard completely works at layer 3 level, using virtual interfaces to associate an IP address to a peer.
+
+  \bigskip
+  Each interface is associated to:
+  \begin{itemize}
+    \item a ``static'' routing table;
+    \item some local ``dynamic'' parameters.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Routing table}
+  \begin{table}[H]
+    \centering
+    \caption{Example of cryptokey routing table for interface \texttt{wg0}}
+    \label{table:routing}
+    \begin{tabular}{|cc|c|cc|}
+      \hline
+      \textbf{\texttt{wg0} pub. key} & \textbf{\texttt{wg0} priv. key} & \textbf{UDP port} & \textbf{Peers public key} & \textbf{Allowed IPs} \\
+      \hline
+      & & & \texttt{xTIB\dots p8Dg} & \texttt{10.192.122.3/32}, \\
+      & & & & \texttt{10.192.124.0/24} \\
+      \texttt{HIgo\dots 8ykw} & \texttt{yAnz\dots fBmk} & 41414 & \texttt{TrMv\dots WXX0} & \texttt{10.192.122.4/32}, \\
+      & & & & \texttt{192.168.0.0/16} \\
+      & & & \texttt{gN65\dots z6EA} & \texttt{10.10.10.230/32} \\
+      \hline
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+\begin{frame}{Local parameters}
+  The parameters stored locally by the peer are:
+  \begin{table}[H]
+    \centering
+    \begin{tabularx}{0.9\textwidth}{lX}
+      $I$ & Identifier\\
+      $S^{pub}, S^{priv}$ & The public-private key pair\\
+      $E^{pub}, E^{priv}$ & The ephemeral public-private key pair\\
+      $T^{send}, T^{recv}$ & Transport data symmetric key\\
+      $N^{send}, N^{recv}$ & Transport data nonce counters\\
+      $H$ & Hash's digest and a chaining key value\\
+      $C$ & Chaining key\\
+      $Q$ & An optional pre-shared symmetric key
+    \end{tabularx}
+  \end{table}
+\end{frame}
+
+\begin{frame}{Session}
+  WireGuard session has the following characteristics:
+  \begin{itemize}
+    \item follows \quoteinline{silence is a virtue} principle;
+    \pause
+    \item no key distribution mechanism is included; % peers are free of choosing the secure mechanism they prefer for sharing their static public keys.
+    \pause
+    \item maintained via a \textbf{time-based} state machine.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Session variables}
+  The state machine depends on the following variables:
+  \begin{table}[H]
+    \centering
+    \begin{tabularx}{0.9\textwidth}{lX}
+      \textsc{Rekey-After-Messages} & $2^{60}$ messages\\
+      \textsc{Rekey-After-Time} & $120$s\\
+      \textsc{Reject-After-Messages} & $2^{64} - 2^{13} - 1$ messages\\
+      \textsc{Reject-After-Time} & $180$s\\
+      \textsc{Rekey-Attempt-Time} & $90$s\\
+      \textsc{Rekey-Timeout} & $5$s\\
+      \textsc{Keepalive-Timeout} & $10$s
+    \end{tabularx}
+  \end{table}
+\end{frame}
+
+\begin{frame}{Message type 1 - \textit{Handshake initiation}}
+  \begin{columns}
+    \hspace{0.05\paperwidth}
+    \begin{column}{0.40\paperwidth}
+      \justifying
+      This is the first message type and is used to start the handshake phase.
+    \end{column}
+    \hspace{10pt}
+    \begin{column}{0.50\paperwidth}
+      \begin{figure}[H]
+        \input{tikz/handshake_initiation.tikz}
+        \caption{Handshake initiation message}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Message type 2 - \textit{Handshake response}}
+  \begin{columns}
+    \begin{column}{0.50\paperwidth}
+      \begin{figure}[H]
+        \input{tikz/handshake_response.tikz}
+        \caption{Handshake response message}
+      \end{figure}
+    \end{column}
+    \begin{column}{0.36\paperwidth}
+      \justifying
+      This message is sent after having successfully processed the handshake initiation.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Message type 3 - \textit{Handshake reply}}
+  \begin{columns}
+    \hspace{0.05\paperwidth}
+    \begin{column}{0.40\paperwidth}
+      \justifying
+      The handshake reply is a particular message sent by the responder if and only if it's under load.
+    \end{column}
+    \hspace{10pt}
+    \begin{column}{0.50\paperwidth}
+      \begin{figure}[H]
+        \input{tikz/handshake_reply.tikz}
+        \caption{Handshake reply message}
+      \end{figure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Message type 4 - \textit{Transport data}}
+  \begin{columns}
+    \begin{column}{0.50\paperwidth}
+      \begin{figure}[H]
+        \input{tikz/transport_data.tikz}
+        \caption{Transport data message}
+      \end{figure}
+    \end{column}
+    \begin{column}{0.36\paperwidth}
+      \justifying
+      The communication of data via an active session happens over transport data messages.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Handshake}
+  This phase sets up all the parameters needed in an active WireGuard session, while authenticating the two peers\pause:
+  \begin{enumerate}
+    \item ephemeral key and identifier generation;
+    \pause
+    \item computation of symmetric key using AEAD;
+    \pause
+    \item deriving the MAC of the timestamp.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Handshake}
+  \begin{figure}[H]
+    \input{tikz/handshake_scheme.tikz}
+    \caption{Handshake scheme}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Communication}
+  \begin{columns}
+    \begin{column}[t]{0.42\paperwidth}
+      \justifying
+      The \textbf{sending} process is divided in the following steps:
+      \begin{enumerate}
+        \item packet inspection and IP matching;
+        \item data encryption with symmetric key;
+        \item setting the nonce counter value;
+        \item loading the packet into UDP queue.
+      \end{enumerate}
+    \end{column}
+    \pause
+    \begin{column}[t]{0.42\paperwidth}
+      \justifying
+      The \textbf{receiving} process is divided in the following steps:
+      \begin{enumerate}
+        \item data decryption using symmetric key;
+        \item check of decrypted packet's format validity;
+        \item reverse IP check;
+        \item forward of the packet to UDP queue.
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+  \pause
+
+  \bigskip
+  \bigskip
+  \centering
+  If any step fails, the packet is dropped.
+\end{frame}
+
+\section{Security}
+
+\begin{frame}{Denial of Service (DOS)}
+  DoS can be caused by the CPU-heavy computation of elliptic curve point multiplication.
+  
+  \bigskip
+  This problem is avoided by using a special message, called \textbf{handshake reply}, to exchange a MAC that will be used to retry the handshake initiation.
+\end{frame}
+
+\begin{frame}{Handshake under load}
+  \begin{figure}[H]
+    \vspace{-10pt}
+    \input{tikz/handshake_scheme_underload.tikz}
+    \caption{Handshake scheme when the responder is under load}
+  \end{figure}
+\end{frame}
+
+\begin{frame}{Post-Quantum}
+  Looking forward to a Post-Quantum scenario, WireGuard allows the adoption of an additional encryption layer using a separate symmetric key.
+  This mode is intended to prevent possible future quantum-powered decryptions of sniffed data traffic.
+
+  \bigskip
+  Is available even a Post-Quantum ready WireGuard implementation, published in \cite{pq-wireguard}, which replaces the 1-RTT key exchange with a Key Encapsulation Mechanism.
+\end{frame}
+
+\begin{frame}{Formal Verification}
+  Using \textbf{Tamarin}, WireGuard has been symbolically analyzed in \cite{wireguardverification} to produce a mathematical proof that its security holds against several attacks and threat models.
+\end{frame}
+
+\begin{frame}{Limitations}
+
+  \begin{columns}
+    \begin{column}[t]{0.42\paperwidth}
+      \justifying
+      WireGuard lacks the following features:
+      \begin{itemize}
+        \item key distribution
+        \item obfuscation
+        \item post-quantum implementation
+      \end{itemize}
+    \end{column}
+    \pause
+    \begin{column}[t]{0.42\paperwidth}
+      \justifying
+      WireGuard has the following vulnerabilities:
+      \begin{itemize}
+        \item authentication forward secrecy
+        \item 1-RTT key exchange can be exploited to perform a \textit{Key Compromise Impersonation} attack~\cite{secanalysis}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\section{Performance}
+
+\begin{frame}{Implementation}
+  WireGuard has been implemented as an external kernel module under just 4000 lines of code.
+  
+  \bigskip
+  This property combined with its simple structure resulted in a high efficient protocol.
+\end{frame}
+
+\begin{frame}{Benchmark results}
+  \begin{table}[H]
+    \centering
+    \caption{VPN benchmark test results}
+    \label{table:benchmark}
+    \begin{tabular}{|l|l|c|c|}
+      \hline
+      & \textbf{Configuration} & \textbf{Throughput}\footnotemark {[Mbps]} & \textbf{Ping time}\footnotemark {[s]}\\
+      \hline
+      \textsl{IPsec} & \textsc{ChaCha20-Poly1305} & 825 & 0.501\\
+            & AES-GCM & 881 & 0.508\\
+      \textsl{OpenVPN} & AES with HMAC-SHA2-256 & 258 & 1.541\\
+      \textsl{WireGuard} & \textsc{ChaCha20-Poly1305} & \cellcolor{blue!60} 1011 & \cellcolor{blue!60} 0.403 \\
+      \hline
+    \end{tabular}
+  \end{table}
+  \footnotetext[1]{higher is better}
+  \footnotetext{lower is better}
+\end{frame}
+
+\begin{frame}{Usability}
+  WireGuard has not only a good performance, but it's even easy adoptable:
+  \begin{itemize}
+    \item simple configuration files
+    \pause
+    \item interfaces managed via basic shell command
+    \pause
+    \item community-driven
+  \end{itemize}
+\end{frame}
+
+\section{Conclusions}
+
+\begin{frame}{Conclusions}
+  \begin{columns}
+    \begin{column}[t]{0.35\paperwidth}
+      \justifying
+      \textcolor{blue!180}{\textbf{Advantages}}
+      \begin{itemize}
+        \item secure and verifiable
+        \item efficient
+        \item minimal implementation
+      \end{itemize}
+    \end{column}
+    \pause
+    \begin{column}[t]{0.45\paperwidth}
+      \justifying
+      \textcolor{red!120}{\textbf{Disadvantages}}
+      \begin{itemize}
+        \item lacks key distribution
+        \item cryptographically opinionated
+        \item no obfuscation mechanism provided
+        \item handshake partial forward-secrecy
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}
+  \begin{definition}[Prenex normal form]
+    A formula is said to be in PNF if the quantifiers are only at the beginning, \ie
+    \begin{align*}
+      \varphi & = \exists p\ \varphi \mid \forall p\ \varphi \mid \alpha \vert \alpha \\
+      \alpha & = p \mid \neg p \mid \alpha \lor \alpha \mid \alpha \land \alpha \mid \dots
+    \end{align*}
+  \end{definition}
+\end{frame}
+
+\standout{Thank you :)}
+
+\references
+
+\end{document}
