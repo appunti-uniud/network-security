@@ -1,18 +1,22 @@
-\documentclass[12pt, a4paper]{report}
+%!TeX program = lualatex
 
-\input{../../template/preamble}
+\documentclass[oneside]{academica}
+\input{preamble}
 
-\title{\Huge{Network Security}}
-\author{\huge{Filippo Merlo}}
+\overtitle{notes for}
+\title{Network Security}
+\author{Filippo Merlo}
 \date{2023-2024}
 
 \begin{document}
 
+\frontmatter
+
 \maketitle
-\newpage
-\pdfbookmark[section]{\contentsname}{toc}
+
 \tableofcontents
-\pagebreak
+
+\mainmatter
 
 \chapter{Introduction}
 
@@ -336,10 +340,10 @@ Usually the message to send, before being encrypted, is concatenated with a \tex
 Another possible use case is that we calculate the control code of the message, then we encrypt only the message content and finally we concatenate them.
 In this way we cut out the additional cost of encryption of the control code, while maintaining the security of the control code.
 
-\nt{
+\begin{note}
   If the control code is calculated after message encryption and concatenated, it becomes useless because if an attacker can just create a new message, encrypt it and then it can calculate the control code.
   The receiver would not know that the message has been completely substituted, because this approach is vulnerable against MITM.
-}
+\end{note}
 
 \subsection{Cryptographic Functions}
 
@@ -862,9 +866,9 @@ However, this holds no more if the attacker Eve is also able to modify the class
 
 \chapter{User Authentication}
 
-\dfn{User Authentication}{
+\begin{definition}[User Authentication]
   The process of determining whether some user, application or process, acting on behalf of a specific user, is really who or what it declares itself to be.
-}
+\end{definition}
 
 Authentication is fundamental for \textbf{authorization}, which instead specifies what a user, application or process can/cannot do.
 \\\\
@@ -893,9 +897,9 @@ We have also to distinct message authentication from entity authentication:
 These means of authentication can be used alone or can be combined.
 In the second case, we call it a \textbf{multifactor/multi-layered} authentication.
 
-\nt{
+\begin{note}
   Pay attention that using multiple authentications of the same type count as a single type and cannot be called multifactor authentication. To be called multifactor, someone must use \textit{different means} of authentication.
-}
+\end{note}
 
 \section{Mutual Authentication Protocols}
 
@@ -1031,9 +1035,9 @@ Even though it seems a secure protocol, has been shown with a static model check
 \end{minipage}
 
 \vspace{5pt}
-\nt{
+\begin{note}
   The message order is kept the same of the real protocol mechanism
-}
+\end{note}
 
 \vspace{5pt}
 The connection is now established and $B$ thinks to be talking to $A$ and that only he and $A$ know the nonces $N_1, N_2$.
@@ -1654,9 +1658,9 @@ Digital signatures provide also non-repudiation.
 \paragraph{Confidentiality} is provided by message encryption, usually with \textbf{AES-128} with \textbf{CBC mode} and each key (called \textit{content-encryption key}) is only used once.
 The \textbf{key itself} is also \textbf{encrypted}, usually with RSA, using the receiver's public key, and this combination of symmetric and asymmetric ciphers, allows reduced encryption/decryption times.
 
-\nt{
+\begin{note}
   S/MIME, it's only a secured version of MIME, thus it manages only the email body. The header is not encrypted and can be read and also altered.
-}
+\end{note}
 
 \vspace{5pt}
 The public keys certificates used by S/MIME conform to X.509 version 3, thus S/MIME managers have to constantly update the list of trusted/untrusted certificates.
